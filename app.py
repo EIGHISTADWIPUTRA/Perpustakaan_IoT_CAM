@@ -256,6 +256,18 @@ def generate_frames():
             time.sleep(1)
             continue
         
+        # Pastikan frame memiliki format yang benar
+        if frame is None or len(frame.shape) != 3 or frame.shape[2] != 3:
+            print(f"Frame format tidak valid: {frame.shape if frame is not None else 'None'}")
+            error_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.putText(error_frame, "Format Video Tidak Valid", (150, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            _, buffer = cv2.imencode('.jpg', error_frame)
+            frame_bytes = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            continue
+        
         # Encode frame
         _, buffer = cv2.imencode('.jpg', frame)
         frame_bytes = buffer.tobytes()
@@ -278,10 +290,15 @@ def get_capture_from_esp32():
             return None
             
         img_arr = np.array(bytearray(img_resp.content), dtype=np.uint8)
-        frame = cv2.imdecode(img_arr, -1)
+        frame = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)  # Pastikan menggunakan IMREAD_COLOR
         
         if frame is None:
             print("Frame kosong dari kamera")
+            return None
+            
+        # Pastikan frame memiliki 3 channel (BGR)
+        if len(frame.shape) != 3 or frame.shape[2] != 3:
+            print(f"Format frame tidak valid: {frame.shape}")
             return None
             
         return frame
@@ -352,6 +369,14 @@ def process_face_recognition():
             }
             return
         
+        # Cek apakah frame memiliki format yang benar
+        if len(frame.shape) != 3 or frame.shape[2] != 3:
+            processing_result = {
+                "status": "error",
+                "message": f"Format gambar tidak valid: {frame.shape}"
+            }
+            return
+            
         # Buat nama file dengan timestamp untuk menyimpan hasil
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         orig_filepath = os.path.join(CAPTURES_FOLDER, f"{timestamp}_capture.jpg")
@@ -360,7 +385,14 @@ def process_face_recognition():
         cv2.imwrite(orig_filepath, frame)
         
         # Konversi ke RGB untuk face_recognition
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        try:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        except Exception as e:
+            processing_result = {
+                "status": "error",
+                "message": f"Gagal mengkonversi gambar: {str(e)}"
+            }
+            return
         
         # Deteksi lokasi wajah
         face_locations = face_recognition.face_locations(rgb_frame)
