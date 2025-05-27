@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Konfigurasi ESP32-CAM">
+    <title>Konfigurasi ESP32-CAM</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h2 class="card-title h4 mb-0">
+                            <i class="fas fa-cog me-2"></i>
+                            Konfigurasi ESP32-CAM
+                        </h2>
+                    </div>
+                    
+                    <div class="card-body">
+                        <!-- Informasi Penting -->
+                        <div class="alert alert-info">
+                            <h5 class="alert-heading">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Informasi Penting
+                            </h5>
+                            <p class="mb-0">Harap masukkan alamat IP ESP32-CAM yang benar. Alamat ini digunakan untuk terhubung ke kamera dan mengambil gambar.</p>
+                        </div>
+                        
+                        <!-- Pesan Error -->
+                        {% if error %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            {{ error }}
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Form Konfigurasi -->
+                        <form method="POST" action="{{ url_for('setup.setup_page') }}">
+                            <div class="mb-3">
+                                <label for="esp32_ip" class="form-label">Alamat IP ESP32-CAM:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-network-wired"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="esp32_ip" name="esp32_ip" 
+                                           value="{{ config.ip }}" required
+                                           placeholder="contoh: 192.168.1.100">
+                                </div>
+                                <div class="form-text text-muted">Alamat IP dari ESP32-CAM pada jaringan lokal.</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="stream_port" class="form-label">Port Streaming:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-plug"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="stream_port" name="stream_port" 
+                                           value="{{ config.stream_port }}"
+                                           placeholder="biasanya 81">
+                                </div>
+                                <div class="form-text text-muted">Port untuk streaming video (biasanya 81).</div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="capture_path" class="form-label">Path Capture:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="fas fa-camera"></i>
+                                    </span>
+                                    <input type="text" class="form-control" id="capture_path" name="capture_path" 
+                                           value="{{ config.capture_path }}"
+                                           placeholder="biasanya /capture">
+                                </div>
+                                <div class="form-text text-muted">Path untuk endpoint pengambilan gambar (biasanya /capture).</div>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>
+                                    Kembali
+                                </a>
+                                <button type="submit" class="btn btn-primary ms-auto">
+                                    <i class="fas fa-save me-2"></i>
+                                    Simpan Konfigurasi
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                <!-- Bantuan Connection -->
+                <div class="card mt-3 shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h3 class="card-title h5 mb-0">
+                            <i class="fas fa-question-circle me-2"></i>
+                            Bantuan Koneksi
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <p>Pastikan ESP32-CAM telah:</p>
+                        <ol>
+                            <li>Terhubung ke jaringan WiFi yang sama dengan perangkat ini</li>
+                            <li>Memiliki alamat IP statis atau dapat diakses secara konsisten</li>
+                            <li>Menjalankan firmware ESP32-CAM dengan benar</li>
+                        </ol>
+                        <p class="mb-0">Jika mengalami kesulitan, coba restart ESP32-CAM dan pastikan koneksi jaringan stabil.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peminjaman Buku</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .rfid-scanner {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .rfid-icon {
+            font-size: 4rem;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        .rfid-active {
+            color: #198754;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .scan-btn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 1.2rem;
+        }
+        .status-text {
+            margin-top: 15px;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-12 text-center mb-4">
+                <h1>Sistem Peminjaman Buku</h1>
+                <p class="lead">Selamat datang, <span id="username"></span>!</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <!-- RFID Scanner -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-book-reader me-2"></i>
+                            Peminjaman Buku
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="rfid-scanner" id="scan-container">
+                            <i class="fas fa-qrcode rfid-icon" id="rfid-icon"></i>
+                            <h4>Pemindaian Buku</h4>
+                            <p class="text-muted">Tekan tombol di bawah untuk memulai pemindaian buku</p>
+                            <button id="btn-start-scan" class="btn btn-primary scan-btn">
+                                <i class="fas fa-search me-2"></i>Mulai Scan
+                            </button>
+                            <p class="status-text text-muted" id="scan-status"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Message -->
+                <div id="alert-message" class="alert d-none mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Element references
+            const username = document.getElementById('username');
+            const rfidIcon = document.getElementById('rfid-icon');
+            const scanStatus = document.getElementById('scan-status');
+            const btnStartScan = document.getElementById('btn-start-scan');
+            const alertMessage = document.getElementById('alert-message');
+            
+            // Ambil username dari parameter URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const usernameParam = urlParams.get('name');
+            
+            if (usernameParam) {
+                username.textContent = usernameParam;
+            }
+            
+            // Tombol mulai scan
+            btnStartScan.addEventListener('click', function() {
+                // Nonaktifkan tombol selama scan
+                btnStartScan.disabled = true;
+                
+                // Ubah status dan icon
+                rfidIcon.classList.add('rfid-active');
+                scanStatus.textContent = 'Memindai buku...';
+                scanStatus.className = 'status-text text-primary';
+                
+                // Kirim perintah ke ESP32 untuk memulai scan
+                $.ajax({
+                    url: '/api/start_scan',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        username: usernameParam || 'Tamu'
+                    }),
+                    success: function(response) {
+                        if (response.status === 'scanning') {
+                            // Tunggu hasil scan (5 detik)
+                            pollScanResult();
+                            } else {
+                            resetScanStatus();
+                            showError('Gagal memulai pemindaian');
+                            resetScanButton();
+                            }
+                    },
+                    error: function() {
+                        resetScanStatus();
+                        showError('Terjadi kesalahan saat memulai pemindaian');
+                        resetScanButton();
+                    }
+                });
+            });
+            
+            // Fungsi untuk polling hasil scan
+            function pollScanResult() {
+                // Tunggu sebentar sebelum mulai polling
+                setTimeout(function() {
+                    // Polling setiap 1 detik
+                    const pollInterval = setInterval(function() {
+                        $.ajax({
+                            url: '/api/scan_result',
+                            method: 'GET',
+                            success: function(response) {
+                                // Jika sudah ada hasil (sukses atau timeout)
+                                if (response.status === 'success' || response.status === 'timeout') {
+                                    // Hentikan polling
+                                    clearInterval(pollInterval);
+                                    
+                                    if (response.status === 'success') {
+                                        // Alihkan ke halaman detail buku
+                                        window.location.href = `/book_detail?rfid=${response.rfid_id}&username=${usernameParam || 'Tamu'}`;
+                                    } else {
+                                        // Alihkan ke halaman timeout
+                                        window.location.href = '/scan_timeout';
+                                    }
+                                }
+                                // Jika masih scanning, lanjutkan polling
+                            },
+                            error: function() {
+                                clearInterval(pollInterval);
+                                resetScanStatus();
+                                showError('Terjadi kesalahan saat memeriksa hasil pemindaian');
+                                resetScanButton();
+                            }
+                        });
+                    }, 1000);
+                    
+                    // Timeout setelah 10 detik (untuk jaga-jaga)
+                    setTimeout(function() {
+                        clearInterval(pollInterval);
+                        resetScanStatus();
+                        showError('Waktu pemindaian habis');
+                        resetScanButton();
+                    }, 10000);
+                }, 500);
+            }
+            
+            // Reset status scan di server jika terjadi error
+            function resetScanStatus() {
+                $.ajax({
+                    url: '/api/reset_scanning',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({}),
+                    error: function() {
+                        console.log('Tidak dapat mereset status scan');
+                    }
+                });
+            }
+            
+            // Reset tombol scan
+            function resetScanButton() {
+                btnStartScan.disabled = false;
+                rfidIcon.classList.remove('rfid-active');
+                scanStatus.textContent = '';
+            }
+            
+            // Tampilkan pesan error
+            function showError(message) {
+                alertMessage.className = 'alert alert-danger mt-3';
+                alertMessage.textContent = message;
+                
+                // Auto hide after 5 seconds
+                setTimeout(function() {
+                    alertMessage.classList.add('d-none');
+                }, 5000);
+            }
+        });
+    </script>
+</body>
+</html> 

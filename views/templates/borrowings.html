@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Peminjaman - Sistem Perpustakaan IoT</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <!-- Header -->
+        <header class="pb-3 mb-4 border-bottom">
+            <div class="d-flex align-items-center justify-content-between">
+                <h1 class="display-6 fw-bold text-primary mb-0">
+                    <i class="fas fa-book-reader me-2"></i>
+                    Daftar Transaksi Peminjaman
+                </h1>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-info" id="sync-btn">
+                        <i class="fas fa-sync me-2"></i>Sinkronisasi
+                    </button>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Kembali
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- Alert Messages -->
+        {% if error %}
+        <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <div id="alert-container"></div>
+
+        <!-- Borrowings Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-table me-2"></i>
+                        Data Peminjaman ({{ borrowings|length }} transaksi)
+                    </h5>
+                    <div>
+                        <button type="button" class="btn btn-light btn-sm" onclick="refreshTable()">
+                            <i class="fas fa-refresh me-1"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if borrowings %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>No</th>
+                                <th>Peminjam</th>
+                                <th>Buku</th>
+                                <th>RFID Tag</th>
+                                <th>Tgl Pinjam</th>
+                                <th>Tgl Kembali</th>
+                                <th>Status</th>
+                                <th>Status Sync</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for borrowing, nama_lengkap, judul, rfid_tag in borrowings %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-circle me-2">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <strong>{{ nama_lengkap }}</strong>
+                                    </div>
+                                </td>
+                                <td>{{ judul }}</td>
+                                <td><code>{{ rfid_tag }}</code></td>
+                                <td>
+                                    <small>{{ borrowing.tanggal_pinjam.strftime('%Y-%m-%d %H:%M') }}</small>
+                                </td>
+                                <td>
+                                    <small>
+                                    {% if borrowing.tanggal_kembali %}
+                                        {{ borrowing.tanggal_kembali.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                    </small>
+                                </td>
+                                <td>
+                                    {% if borrowing.status == 'dipinjam' %}
+                                        <span class="badge bg-warning">Dipinjam</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Dikembalikan</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if borrowing.synced_to_server %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Synced
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-clock me-1"></i>Pending
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button type="button" class="btn btn-outline-info" 
+                                                onclick="viewBorrowing('{{ borrowing.id_peminjaman }}')"
+                                                title="Lihat Detail">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if borrowing.status == 'dipinjam' %}
+                                        <button type="button" class="btn btn-outline-success"
+                                                onclick="returnBook('{{ borrowing.id_peminjaman }}', '{{ nama_lengkap }}')"
+                                                title="Kembalikan Buku">
+                                            <i class="fas fa-undo"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-book text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3 text-muted">Belum Ada Transaksi Peminjaman</h4>
+                    <p class="text-muted">Saat ini belum ada buku yang dipinjam.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Filter and Search -->
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Filter Status</h6>
+                    </div>
+                    <div class="card-body">
+                        <select class="form-select" id="status-filter" onchange="filterTable()">
+                            <option value="all">Semua Status</option>
+                            <option value="dipinjam">Dipinjam</option>
+                            <option value="dikembalikan">Dikembalikan</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">Pencarian</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="search-input" 
+                                   placeholder="Cari berdasarkan nama peminjam atau judul buku...">
+                            <button class="btn btn-outline-secondary" type="button" onclick="filterTable()">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Detail Peminjaman -->
+        <div class="modal fade" id="borrowingDetailModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Detail Peminjaman
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Detail content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Handle sync button click
+        document.getElementById('sync-btn').addEventListener('click', function() {
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Syncing...';
+
+            $.ajax({
+                url: '/api/sync/borrowings/manual',
+                method: 'POST',
+                success: function(response) {
+                    if (response.status === 'success') {
+                        showAlert('Sinkronisasi berhasil dimulai', 'success');
+                        // Reload after 2 seconds
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        showAlert(response.message || 'Gagal melakukan sinkronisasi', 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Terjadi kesalahan saat sinkronisasi', 'danger');
+                },
+                complete: function() {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            });
+        });
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.appendChild(alert);
+
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function viewBorrowing(id) {
+            // Show loading state in modal
+            const modal = new bootstrap.Modal(document.getElementById('borrowingDetailModal'));
+            const modalBody = document.querySelector('#borrowingDetailModal .modal-body');
+            modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+            modal.show();
+
+            // Load detail data
+            $.ajax({
+                url: `/api/borrowing/${id}`,
+                success: function(response) {
+                    if (response.status === 'success') {
+                        modalBody.innerHTML = `
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Data Peminjam:</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th>Nama</th>
+                                            <td>${response.data.user.nama_lengkap}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Email</th>
+                                            <td>${response.data.user.email}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Data Buku:</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th>Judul</th>
+                                            <td>${response.data.book.judul}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>RFID</th>
+                                            <td><code>${response.data.book.rfid_tag}</code></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-12">
+                                    <h6>Detail Transaksi:</h6>
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th width="200">ID Peminjaman</th>
+                                            <td>${response.data.id_peminjaman}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Tanggal Pinjam</th>
+                                            <td>${response.data.tanggal_pinjam}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Tanggal Kembali</th>
+                                            <td>${response.data.tanggal_kembali || '-'}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Status</th>
+                                            <td>
+                                                <span class="badge bg-${response.data.status === 'dipinjam' ? 'warning' : 'success'}">
+                                                    ${response.data.status}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>Status Sinkronisasi</th>
+                                            <td>
+                                                <span class="badge bg-${response.data.synced_to_server ? 'success' : 'warning'}">
+                                                    ${response.data.synced_to_server ? 'Synced' : 'Pending'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        modalBody.innerHTML = `
+                            <div class="alert alert-danger">
+                                ${response.message || 'Gagal memuat detail peminjaman'}
+                            </div>
+                        `;
+                    }
+                },
+                error: function() {
+                    modalBody.innerHTML = `
+                        <div class="alert alert-danger">
+                            Terjadi kesalahan saat memuat detail peminjaman
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        function returnBook(id, nama) {
+            if (confirm(`Konfirmasi pengembalian buku dari ${nama}?`)) {
+                $.ajax({
+                    url: '/api/return_book',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        peminjaman_id: id
+                    }),
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            showAlert('Buku berhasil dikembalikan', 'success');
+                            setTimeout(() => location.reload(), 1500);
+                        } else {
+                            showAlert(response.message || 'Gagal mengembalikan buku', 'danger');
+                        }
+                    },
+                    error: function() {
+                        showAlert('Terjadi kesalahan saat mengembalikan buku', 'danger');
+                    }
+                });
+            }
+        }
+
+        function filterTable() {
+            const status = document.getElementById('status-filter').value;
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const rows = document.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                const statusCell = row.querySelector('td:nth-child(7)').textContent.toLowerCase();
+                const nameCell = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+                const bookCell = row.querySelector('td:nth-child(3)').textContent.toLowerCase();
+
+                const statusMatch = status === 'all' || statusCell.includes(status);
+                const searchMatch = !search || 
+                    nameCell.includes(search) || 
+                    bookCell.includes(search);
+
+                row.style.display = statusMatch && searchMatch ? '' : 'none';
+            });
+        }
+
+        function refreshTable() {
+            location.reload();
+        }
+    </script>
+</body>
+</html>

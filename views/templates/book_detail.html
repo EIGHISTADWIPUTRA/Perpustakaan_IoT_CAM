@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detail Buku</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .book-container {
+            padding: 30px;
+        }
+        .book-cover {
+            max-width: 90%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .success-icon {
+            font-size: 5rem;
+            color: #28a745;
+            margin-bottom: 1rem;
+        }
+        .book-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .borrow-info {
+            background-color: #e9f7ef;
+            border-left: 5px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-12 text-center mb-4">
+                <h1>Peminjaman Berhasil</h1>
+                <p class="lead">Halo, <span id="username"></span>!</p>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-10 offset-md-1">
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Detail Buku
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center mb-4">
+                            <i class="fas fa-check-circle success-icon"></i>
+                            <h2 class="book-title" id="book-title"></h2>
+                        </div>
+                        
+                        <div class="borrow-info">
+                            <p class="mb-0"><i class="fas fa-info-circle me-2"></i> Buku berhasil dipinjam! Silakan ambil buku dari rak dan jangan lupa untuk mengembalikannya tepat waktu.</p>
+                        </div>
+
+                        <div class="row book-container">
+                            <div class="col-md-4 text-center">
+                                <img src="{{ url_for('static', filename='img/book_cover.jpg') }}" 
+                                     alt="Sampul Buku" class="img-fluid rounded book-cover" id="book-cover">
+                            </div>
+                            <div class="col-md-8">
+                                <table class="table table-borderless">
+                                    <tbody>
+                                        <tr>
+                                            <th style="width:120px">ID Buku</th>
+                                            <td id="book-id">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Penulis</th>
+                                            <td id="book-author">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Tahun</th>
+                                            <td id="book-year">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Kategori</th>
+                                            <td id="book-category">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Tanggal Pinjam</th>
+                                            <td id="borrow-date">-</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Tanggal Kembali</th>
+                                            <td id="return-date">-</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer text-center">
+                        <a href="/" class="btn btn-primary">
+                            <i class="fas fa-home me-2"></i>Kembali ke Halaman Utama
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Element references
+            const username = document.getElementById('username');
+            const bookTitle = document.getElementById('book-title');
+            const bookId = document.getElementById('book-id');
+            const bookAuthor = document.getElementById('book-author');
+            const bookYear = document.getElementById('book-year');
+            const bookCategory = document.getElementById('book-category');
+            const borrowDate = document.getElementById('borrow-date');
+            const returnDate = document.getElementById('return-date');
+            
+            // Ambil parameter dari URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const usernameParam = urlParams.get('username');
+            const rfidParam = urlParams.get('rfid');
+            
+            // Set username
+            if (usernameParam) {
+                username.textContent = usernameParam;
+            }
+            
+            // Dapatkan detail buku berdasarkan RFID
+            if (rfidParam) {
+                $.ajax({
+                    url: '/api/get_book_detail',
+                    method: 'GET',
+                    data: { 
+                        rfid_id: rfidParam,
+                        username: usernameParam,
+                     },
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            // Tampilkan detail buku
+                            bookTitle.textContent = response.book_data.judul;
+                            bookId.textContent = response.book_data.id;
+                            bookAuthor.textContent = response.book_data.penulis;
+                            bookYear.textContent = response.book_data.tahun;
+                            bookCategory.textContent = response.book_data.kategori;
+                            borrowDate.textContent = response.peminjaman.tanggal_pinjam;
+                            returnDate.textContent = response.peminjaman.tanggal_kembali;
+                        } else {
+                            // Jika ada error
+                            alert('Error: ' + response.message);
+                            window.location.href = '/peminjaman';
+                        }
+                    },
+                    error: function() {
+                        alert('Terjadi kesalahan saat mengambil detail buku');
+                        window.location.href = '/peminjaman';
+                    }
+                });
+            } else {
+                alert('RFID buku tidak ditemukan');
+                window.location.href = '/peminjaman';
+            }
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrasi User - Sistem Perpustakaan IoT</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .registration-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .camera-preview {
+            background-color: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            min-height: 400px;
+        }
+        .face-preview {
+            border: 3px solid #28a745;
+            border-radius: 10px;
+            max-width: 200px;
+            margin: 0 auto;
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .step-indicator {
+            margin-bottom: 30px;
+        }
+        .step-indicator .step-item {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #dee2e6;
+            color: #6c757d;
+            text-align: center;
+            line-height: 30px;
+            margin: 0 10px;
+            position: relative;
+        }
+        .step-indicator .step-item.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        .step-indicator .step-item.completed {
+            background-color: #28a745;
+            color: white;
+        }
+        .step-indicator .step-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            right: -20px;
+            width: 20px;
+            height: 2px;
+            background-color: #dee2e6;
+        }
+        .step-indicator .step-item.completed:not(:last-child)::after {
+            background-color: #28a745;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <!-- Header -->
+        <header class="pb-3 mb-4 border-bottom">
+            <div class="d-flex align-items-center justify-content-between">
+                <h1 class="display-6 fw-bold text-primary mb-0">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Registrasi User Baru
+                </h1>
+                <div>
+                    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Kembali
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div class="registration-container">
+            <!-- Step Indicator -->
+            <div class="step-indicator text-center">
+                <div class="step-item active" id="step-indicator-1">1</div>
+                <div class="step-item" id="step-indicator-2">2</div>
+                <div class="step-item" id="step-indicator-3">3</div>
+            </div>
+
+            <!-- Step 1: Form Data -->
+            <div class="step active" id="step-1">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-user-edit me-2"></i>
+                            Langkah 1: Data Pengguna
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="user-data-form">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="nama_lengkap" class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="nama_lengkap" name="nama_lengkap" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                        <input type="email" class="form-control" id="email" name="email" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-primary" id="next-to-step-2">
+                                    Selanjutnya <i class="fas fa-arrow-right ms-2"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Face Capture -->
+            <div class="step" id="step-2">
+                <div class="row g-4">
+                    <div class="col-md-8">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-camera me-2"></i>
+                                    Langkah 2: Foto Wajah
+                                </h5>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="camera-preview">
+                                    <img id="camera-stream" src="{{ url_for('main.video_feed') }}" alt="Camera Stream" class="img-fluid w-100">
+                                    
+                                    <!-- Processing Overlay -->
+                                    <div id="capture-overlay" class="overlay d-none">
+                                        <div class="spinner-border text-primary mb-3" role="status">
+                                            <span class="visually-hidden">Memproses...</span>
+                                        </div>
+                                        <div class="text-white">Memproses foto wajah...</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer text-center">
+                                <button type="button" class="btn btn-success btn-lg" id="capture-face-btn">
+                                    <i class="fas fa-camera me-2"></i>Ambil Foto Wajah
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="card-title mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Instruksi
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled">
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Posisikan wajah di tengah kamera</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Pastikan pencahayaan cukup</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Tatap kamera dengan jelas</li>
+                                    <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Jangan gunakan masker atau kacamata</li>
+                                </ul>
+                                
+                                <!-- Face Preview -->
+                                <div id="face-preview-container" class="d-none mt-4">
+                                    <h6>Preview Wajah:</h6>
+                                    <img id="face-preview" src="" alt="Face Preview" class="face-preview img-fluid">
+                                </div>
+                            </div>
+                            <div class="card-footer">
+                                <button type="button" class="btn btn-secondary w-100" id="back-to-step-1">
+                                    <i class="fas fa-arrow-left me-2"></i>Kembali
+                                </button>
+                                <button type="button" class="btn btn-primary w-100 mt-2 d-none" id="next-to-step-3">
+                                    Lanjutkan <i class="fas fa-arrow-right ms-2"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Confirmation -->
+            <div class="step" id="step-3">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-check-circle me-2"></i>
+                            Langkah 3: Konfirmasi Registrasi
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Data Pengguna:</h6>
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <th width="150">Nama Lengkap:</th>
+                                        <td id="confirm-nama"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Email:</th>
+                                        <td id="confirm-email"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status:</th>
+                                        <td><span class="badge bg-success">Siap untuk didaftarkan</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <h6>Foto Wajah:</h6>
+                                <img id="final-face-preview" src="" alt="Final Face Preview" class="face-preview img-fluid">
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="button" class="btn btn-secondary me-2" id="back-to-step-2">
+                                <i class="fas fa-arrow-left me-2"></i>Kembali
+                            </button>
+                            <button type="button" class="btn btn-success btn-lg" id="confirm-registration">
+                                <i class="fas fa-user-check me-2"></i>Daftar Sekarang
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alert Messages -->
+            <div id="alert-container" class="mt-3"></div>
+        </div>
+    </div>
+
+    <!-- Registration Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-check-circle me-2"></i>
+                        Registrasi Berhasil!
+                    </h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-user-check text-success" style="font-size: 4rem;"></i>
+                    </div>
+                    <h4 id="success-user-name"></h4>
+                    <p class="lead">Selamat! Akun Anda berhasil didaftarkan dalam sistem perpustakaan.</p>
+                    <img id="success-face-image" src="" alt="Registered Face" class="img-fluid rounded" style="max-width: 200px;">
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <a href="{{ url_for('main.index') }}" class="btn btn-primary">
+                        <i class="fas fa-home me-2"></i>Kembali ke Beranda
+                    </a>
+                    <button type="button" class="btn btn-success" onclick="location.reload()">
+                        <i class="fas fa-user-plus me-2"></i>Daftar User Lain
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        let userData = {};
+        let capturedFaceData = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Step navigation
+            document.getElementById('next-to-step-2').addEventListener('click', function() {
+                if (validateStep1()) {
+                    goToStep(2);
+                }
+            });
+
+            document.getElementById('back-to-step-1').addEventListener('click', function() {
+                goToStep(1);
+            });
+
+            document.getElementById('next-to-step-3').addEventListener('click', function() {
+                goToStep(3);
+            });
+
+            document.getElementById('back-to-step-2').addEventListener('click', function() {
+                goToStep(2);
+            });
+
+            // Face capture
+            document.getElementById('capture-face-btn').addEventListener('click', captureFace);
+
+            // Final registration
+            document.getElementById('confirm-registration').addEventListener('click', confirmRegistration);
+        });
+
+        function validateStep1() {
+            const nama = document.getElementById('nama_lengkap').value.trim();
+            const email = document.getElementById('email').value.trim();
+
+            if (!nama || !email) {
+                showAlert('Harap isi semua field yang diperlukan', 'danger');
+                return false;
+            }
+
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showAlert('Format email tidak valid', 'danger');
+                return false;
+            }
+
+            userData = { nama_lengkap: nama, email: email };
+            return true;
+        }
+
+        function goToStep(stepNumber) {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+
+            // Show target step
+            document.getElementById(`step-${stepNumber}`).classList.add('active');
+
+            // Update step indicators
+            for (let i = 1; i <= 3; i++) {
+                const indicator = document.getElementById(`step-indicator-${i}`);
+                indicator.classList.remove('active', 'completed');
+                
+                if (i < stepNumber) {
+                    indicator.classList.add('completed');
+                } else if (i === stepNumber) {
+                    indicator.classList.add('active');
+                }
+            }
+
+            // Fill confirmation data if going to step 3
+            if (stepNumber === 3) {
+                document.getElementById('confirm-nama').textContent = userData.nama_lengkap;
+                document.getElementById('confirm-email').textContent = userData.email;
+                
+                if (capturedFaceData) {
+                    document.getElementById('final-face-preview').src = 'data:image/jpeg;base64,' + capturedFaceData.face_crop_base64;
+                }
+            }
+        }
+
+        function captureFace() {
+            const captureBtn = document.getElementById('capture-face-btn');
+            const overlay = document.getElementById('capture-overlay');
+            
+            // Disable button dan show loading
+            captureBtn.disabled = true;
+            overlay.classList.remove('d-none');
+            
+            // Update button text
+            const originalText = captureBtn.innerHTML;
+            captureBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Memproses...';
+
+            $.ajax({
+                url: '/user/capture_face',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}),
+                timeout: 30000, // 30 second timeout
+                success: function(response) {
+                    overlay.classList.add('d-none');
+                    
+                    if (response.status === 'success') {
+                        capturedFaceData = response;
+                        
+                        // Show face preview
+                        const previewContainer = document.getElementById('face-preview-container');
+                        const previewImg = document.getElementById('face-preview');
+                        
+                        previewImg.src = 'data:image/jpeg;base64,' + response.face_crop_base64;
+                        previewContainer.classList.remove('d-none');
+                        
+                        // Show next button
+                        document.getElementById('next-to-step-3').classList.remove('d-none');
+                        
+                        showAlert('Wajah berhasil ditangkap! Silakan lanjutkan ke tahap berikutnya.', 'success');
+                        
+                    } else if (response.status === 'duplicate') {
+                        showAlert(response.message, 'warning');
+                        
+                    } else {
+                        showAlert(response.message || 'Gagal menangkap wajah', 'danger');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    overlay.classList.add('d-none');
+                    
+                    let errorMessage = 'Terjadi kesalahan saat menangkap wajah';
+                    
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    } else if (status === 'timeout') {
+                        errorMessage = 'Timeout: Kamera membutuhkan waktu terlalu lama untuk merespons';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error: Periksa koneksi ESP32-CAM';
+                    } else if (xhr.status === 0) {
+                        errorMessage = 'Tidak dapat terhubung ke server';
+                    }
+                    
+                    showAlert(errorMessage, 'danger');
+                    console.error('Capture face error:', {
+                        status: status,
+                        error: error,
+                        response: xhr.responseText
+                    });
+                },
+                complete: function() {
+                    captureBtn.disabled = false;
+                    captureBtn.innerHTML = originalText;
+                }
+            });
+        }
+
+        // Tambahan: Function untuk retry capture
+        function retryCaptureAfterDelay(delay = 2000) {
+            setTimeout(function() {
+                if (confirm('Ingin mencoba mengambil foto lagi?')) {
+                    captureFace();
+                }
+            }, delay);
+        }
+
+        function confirmRegistration() {
+            if (!capturedFaceData) {
+                showAlert('Harap ambil foto wajah terlebih dahulu', 'danger');
+                return;
+            }
+
+            const confirmBtn = document.getElementById('confirm-registration');
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Mendaftarkan...';
+
+            // FIXED: Kirim base64 image yang sudah di-crop (bukan full image)
+            const registrationData = {
+                nama_lengkap: userData.nama_lengkap,
+                email: userData.email,
+                face_image_data: capturedFaceData.face_crop_base64  // ✅ Hanya crop wajah
+            };
+
+            $.ajax({
+                url: '/user/save_registration',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(registrationData),
+                success: function(response) {
+                    if (response.status === 'success') {
+                        // Show success modal
+                        document.getElementById('success-user-name').textContent = userData.nama_lengkap;
+                        document.getElementById('success-face-image').src = 'data:image/jpeg;base64,' + capturedFaceData.face_crop_base64;
+                        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                        successModal.show();
+
+                        // Reload face encodings agar wajah langsung dikenali tanpa restart
+                        $.ajax({
+                            url: '/api/reload_faces',
+                            method: 'POST'
+                        });
+                    } else {
+                        showAlert(response.message || 'Gagal mendaftarkan user', 'danger');
+                    }
+                },
+                error: function() {
+                    showAlert('Terjadi kesalahan saat mendaftarkan user', 'danger');
+                },
+                complete: function() {
+                    confirmBtn.disabled = false;
+                    confirmBtn.innerHTML = '<i class="fas fa-user-check me-2"></i>Daftar Sekarang';
+                }
+            });
+        }
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alert-container');
+            const alertId = 'alert-' + Date.now();
+            
+            const alertHtml = `
+                <div class="alert alert-${type} alert-dismissible fade show" id="${alertId}">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            
+            alertContainer.innerHTML = alertHtml;
+            
+            // Auto hide after 5 seconds
+            setTimeout(function() {
+                const alertElement = document.getElementById(alertId);
+                if (alertElement) {
+                    const bsAlert = new bootstrap.Alert(alertElement);
+                    bsAlert.close();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
