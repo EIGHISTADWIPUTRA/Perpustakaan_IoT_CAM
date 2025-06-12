@@ -7,6 +7,11 @@ import threading
 import time
 import json
 import random
+import logging
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Inisialisasi Blueprint
 api_bp = Blueprint('api', __name__)
@@ -305,19 +310,27 @@ def get_book_detail():
     if not rfid_id:
         return jsonify({"status": "error", "message": "ID RFID tidak ditemukan"})
     
-    # Dapatkan informasi buku
-    book_info = book_model.get_book_by_rfid(rfid_id)
+    # Log info untuk debugging
+    logger.info(f"GET /api/get_book_detail - RFID: {rfid_id}, Username: {request.args.get('username')}")
     
-    # Jika berhasil, proses peminjaman secara otomatis
-    if book_info["status"] == "success":
-        # Anggap username dari parameter atau pakai default
-        username = request.args.get('username') or 'Pengguna'
+    try:
+        # Dapatkan informasi buku
+        book_info = book_model.get_book_by_rfid(rfid_id)
         
-        # Proses peminjaman
-        result = book_model.proses_peminjaman(rfid_id, username)
-        return jsonify(result)
-    
-    return jsonify(book_info)
+        # Jika berhasil, proses peminjaman secara otomatis
+        if book_info["status"] == "success":
+            # Anggap username dari parameter atau pakai default
+            username = request.args.get('username') or 'Pengguna'
+            
+            # Proses peminjaman
+            result = book_model.proses_peminjaman(rfid_id, username)
+            logger.info(f"Hasil peminjaman: {result}")
+            return jsonify(result)
+        
+        return jsonify(book_info)
+    except Exception as e:
+        logger.error(f"Error dalam get_book_detail: {str(e)}")
+        return jsonify({"status": "error", "message": f"Terjadi kesalahan: {str(e)}"})
 
 @api_bp.route('/reset_scanning', methods=['POST'])
 def reset_scanning():

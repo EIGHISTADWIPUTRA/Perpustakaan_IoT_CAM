@@ -25,8 +25,8 @@ app.secret_key = os.environ.get('SECRET_KEY')
 app.register_blueprint(main_bp)
 app.register_blueprint(api_bp, url_prefix='/api')
 app.register_blueprint(setup_bp)
-app.register_blueprint(webhook_bp, url_prefix='/api')  # Webhook endpoints
-app.register_blueprint(sync_bp, url_prefix='/api')    # Sync endpoints  
+app.register_blueprint(webhook_bp, url_prefix='/api')  # Webhook endpoints at /api/...
+app.register_blueprint(sync_bp, url_prefix='/api')    # Sync endpoints at /api/... (e.g. /api/borrowing/123)
 app.register_blueprint(user_bp, url_prefix='/user')   # User management
 app.register_blueprint(admin_bp)                      # Admin endpoints
 

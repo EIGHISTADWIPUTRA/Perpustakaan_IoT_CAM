@@ -149,8 +149,8 @@
                                     clearInterval(pollInterval);
                                     
                                     if (response.status === 'success') {
-                                        // Alihkan ke halaman detail buku
-                                        window.location.href = `/book_detail?rfid=${response.rfid_id}&username=${usernameParam || 'Tamu'}`;
+                                        // Alihkan ke halaman detail buku dengan parameter rfid_id yang benar
+                                        window.location.href = `/book_detail?rfid_id=${response.rfid_id}&username=${usernameParam || 'Tamu'}`;
                                     } else {
                                         // Alihkan ke halaman timeout
                                         window.location.href = '/scan_timeout';

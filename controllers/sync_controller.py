@@ -12,7 +12,7 @@ sync_bp = Blueprint('sync', __name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@sync_bp.route('/sync/users/manual', methods=['POST'])
+@sync_bp.route('/users/manual', methods=['POST'])
 def manual_sync_users():
     """
     Manual sync semua user yang belum ter-sync ke Laravel
@@ -39,7 +39,7 @@ def manual_sync_users():
             "message": f"Failed to start sync: {str(e)}"
         }), 500
 
-@sync_bp.route('/sync/borrowings/manual', methods=['POST'])
+@sync_bp.route('/borrowings/manual', methods=['POST'])
 def manual_sync_borrowings():
     """
     Manual sync semua borrowing yang belum ter-sync ke Laravel
@@ -66,7 +66,7 @@ def manual_sync_borrowings():
             "message": f"Failed to start sync: {str(e)}"
         }), 500
 
-@sync_bp.route('/sync/test_connection', methods=['POST'])
+@sync_bp.route('/test_connection', methods=['POST'])
 def test_laravel_connection():
     """
     Test koneksi ke Laravel
@@ -93,7 +93,7 @@ def test_laravel_connection():
             "message": f"Connection test failed: {str(e)}"
         }), 500
 
-@sync_bp.route('/sync/status', methods=['GET'])
+@sync_bp.route('/status', methods=['GET'])
 def sync_status():
     """
     Cek status sync - berapa data yang belum ter-sync
@@ -138,7 +138,7 @@ def sync_status():
             "message": f"Failed to get sync status: {str(e)}"
         }), 500
 
-@sync_bp.route('/sync/user/<int:user_id>', methods=['POST'])
+@sync_bp.route('/user/<int:user_id>', methods=['POST'])
 def sync_single_user(user_id):
     """
     Sync user tertentu ke Laravel
@@ -165,7 +165,7 @@ def sync_single_user(user_id):
             "message": f"Sync failed: {str(e)}"
         }), 500
 
-@sync_bp.route('/sync/borrowing/<int:borrowing_id>', methods=['POST'])
+@sync_bp.route('/borrowing/<int:borrowing_id>', methods=['POST'])
 def sync_single_borrowing(borrowing_id):
     """
     Sync borrowing tertentu ke Laravel

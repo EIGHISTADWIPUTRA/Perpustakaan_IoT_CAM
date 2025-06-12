@@ -2,7 +2,12 @@
 from datetime import datetime, timedelta
 from models.database import Book, Borrowing, User, SyncQueue, get_db
 from sqlalchemy.orm import Session # type: ignore
+from models.sync_service import sync_service  # Impor sync_service untuk sinkronisasi langsung
 import json
+import logging
+
+# Setup logging
+logger = logging.getLogger(__name__)
 
 class BookModel:
     def __init__(self):
@@ -138,6 +143,38 @@ class BookModel:
             db.add(sync_queue)
             db.commit()
             
+            # Simpan ID peminjaman untuk digunakan dalam thread terpisah
+            borrowing_id_for_sync = borrowing.id_peminjaman
+            
+            # Kirim data peminjaman langsung ke Laravel
+            try:
+                # Gunakan thread terpisah agar tidak menghambat respons ke user
+                import threading
+                
+                def sync_in_background():
+                    try:
+                        # Gunakan session baru dalam thread ini untuk menghindari konflik
+                        # Simpan hasil ke variabel lokal, bukan global
+                        sync_result = sync_service.sync_borrowing_to_laravel(borrowing_id_for_sync)
+                        if sync_result['success']:
+                            logger.info(f"Peminjaman ID {borrowing_id_for_sync} berhasil disinkronkan ke Laravel")
+                        else:
+                            logger.warning(f"Gagal sinkronisasi peminjaman ID {borrowing_id_for_sync}: {sync_result.get('error', 'Unknown error')}")
+                    except Exception as sync_err:
+                        logger.error(f"Exception in sync thread: {str(sync_err)}")
+                
+                # Gunakan Timer untuk menjalankan sinkronisasi setelah response dikembalikan
+                # Ini mencegah konflik session database
+                threading.Timer(2.0, sync_in_background).start()
+                
+            except Exception as sync_error:
+                # Jika gagal sinkronisasi, tidak menggagalkan proses peminjaman
+                logger.error(f"Gagal mengirim data peminjaman ke Laravel: {str(sync_error)}")
+            
+            # Log data book untuk debugging
+            logger.info(f"Book data: ID={book.id_buku}, Judul={book.judul}, Penulis={book.penulis}")
+            logger.info(f"Borrowing data: ID={borrowing.id_peminjaman}, Status={borrowing.status}")
+            
             return {
                 "status": "success",
                 "message": f"Buku '{book.judul}' berhasil dipinjam oleh {username}",
@@ -147,6 +184,7 @@ class BookModel:
                     "penulis": book.penulis
                 },
                 "peminjaman": {
+                    "id_peminjaman": borrowing.id_peminjaman,
                     "tanggal_pinjam": borrowing.tanggal_pinjam.strftime("%Y-%m-%d"),
                     "tanggal_kembali": borrowing.tanggal_kembali.strftime("%Y-%m-%d")
                 }
@@ -159,7 +197,10 @@ class BookModel:
                 "message": f"Error: {str(e)}"
             }
         finally:
-            db.close()
+            try:
+                db.close()
+            except Exception as close_err:
+                logger.warning(f"Error closing database connection: {str(close_err)}")
     
     def kembalikan_buku(self, username):
         """Mengembalikan buku yang dipinjam oleh pengguna"""
@@ -212,12 +253,39 @@ class BookModel:
             db.add(sync_queue)
             db.commit()
             
+            # Simpan ID peminjaman untuk digunakan dalam thread terpisah
+            borrowing_id_for_sync = borrowing.id_peminjaman
+            book_title = book.judul
+            book_id = book.id_buku
+            
+            # Kirim data pengembalian langsung ke Laravel
+            try:
+                # Gunakan thread terpisah agar tidak menghambat respons ke user
+                import threading
+                
+                def sync_in_background():
+                    try:
+                        sync_result = sync_service.sync_borrowing_to_laravel(borrowing_id_for_sync)
+                        if sync_result['success']:
+                            logger.info(f"Pengembalian untuk peminjaman ID {borrowing_id_for_sync} berhasil disinkronkan ke Laravel")
+                        else:
+                            logger.warning(f"Gagal sinkronisasi pengembalian untuk peminjaman ID {borrowing_id_for_sync}: {sync_result.get('error', 'Unknown error')}")
+                    except Exception as sync_err:
+                        logger.error(f"Exception in sync thread: {str(sync_err)}")
+                
+                # Gunakan Timer untuk menjalankan sinkronisasi setelah response dikembalikan
+                threading.Timer(2.0, sync_in_background).start()
+                
+            except Exception as sync_error:
+                # Jika gagal sinkronisasi, tidak menggagalkan proses pengembalian
+                logger.error(f"Gagal mengirim data pengembalian ke Laravel: {str(sync_error)}")
+            
             return {
                 "status": "success",
-                "message": f"Buku '{book.judul}' berhasil dikembalikan",
+                "message": f"Buku '{book_title}' berhasil dikembalikan",
                 "book_data": {
-                    "id": book.id_buku,
-                    "judul": book.judul
+                    "id": book_id,
+                    "judul": book_title
                 }
             }
             
@@ -228,4 +296,7 @@ class BookModel:
                 "message": f"Error: {str(e)}"
             }
         finally:
-            db.close()
+            try:
+                db.close()
+            except Exception as close_err:
+                logger.warning(f"Error closing database connection: {str(close_err)}")

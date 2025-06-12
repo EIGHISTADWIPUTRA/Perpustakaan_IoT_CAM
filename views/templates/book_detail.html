@@ -83,10 +83,6 @@
                                             <td id="book-year">-</td>
                                         </tr>
                                         <tr>
-                                            <th>Kategori</th>
-                                            <td id="book-category">-</td>
-                                        </tr>
-                                        <tr>
                                             <th>Tanggal Pinjam</th>
                                             <td id="borrow-date">-</td>
                                         </tr>
@@ -122,16 +118,18 @@
             const bookCategory = document.getElementById('book-category');
             const borrowDate = document.getElementById('borrow-date');
             const returnDate = document.getElementById('return-date');
-            
-            // Ambil parameter dari URL
+              // Ambil parameter dari URL
             const urlParams = new URLSearchParams(window.location.search);
             const usernameParam = urlParams.get('username');
-            const rfidParam = urlParams.get('rfid');
+            const rfidParam = urlParams.get('rfid_id'); // Sesuaikan dengan parameter yang sebenarnya (rfid_id bukan rfid)
             
             // Set username
             if (usernameParam) {
                 username.textContent = usernameParam;
             }
+            
+            console.log('RFID Parameter:', rfidParam);
+            console.log('Username Parameter:', usernameParam);
             
             // Dapatkan detail buku berdasarkan RFID
             if (rfidParam) {
@@ -141,26 +139,34 @@
                     data: { 
                         rfid_id: rfidParam,
                         username: usernameParam,
-                     },
-                    success: function(response) {
+                     },                    success: function(response) {
+                        console.log('API Response:', response);
+                        
                         if (response.status === 'success') {
                             // Tampilkan detail buku
-                            bookTitle.textContent = response.book_data.judul;
-                            bookId.textContent = response.book_data.id;
-                            bookAuthor.textContent = response.book_data.penulis;
-                            bookYear.textContent = response.book_data.tahun;
-                            bookCategory.textContent = response.book_data.kategori;
-                            borrowDate.textContent = response.peminjaman.tanggal_pinjam;
-                            returnDate.textContent = response.peminjaman.tanggal_kembali;
+                            if (response.book_data) {
+                                bookTitle.textContent = response.book_data.judul || '-';
+                                bookId.textContent = response.book_data.id || '-';
+                                bookAuthor.textContent = response.book_data.penulis || '-';
+                                bookYear.textContent = response.book_data.tahun_terbit || response.book_data.tahun_terbit || '-';
+                            }
+                            
+                            if (response.peminjaman) {
+                                borrowDate.textContent = response.peminjaman.tanggal_pinjam || '-';
+                                returnDate.textContent = response.peminjaman.tanggal_kembali || '-';
+                            }
                         } else {
                             // Jika ada error
                             alert('Error: ' + response.message);
+                            console.error('Error response:', response);
                             window.location.href = '/peminjaman';
                         }
-                    },
-                    error: function() {
-                        alert('Terjadi kesalahan saat mengambil detail buku');
-                        window.location.href = '/peminjaman';
+                    },                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('AJAX Error:', textStatus, errorThrown);
+                        console.error('Response:', jqXHR.responseText);
+                        alert('Terjadi kesalahan saat mengambil detail buku: ' + textStatus);
+                        // Tidak langsung redirect agar user bisa melihat error
+                        // window.location.href = '/peminjaman';
                     }
                 });
             } else {

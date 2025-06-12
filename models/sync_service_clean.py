@@ -246,15 +246,12 @@ class SyncService:
                 'status': borrowing.status,
                 'created_at': borrowing.created_at.isoformat() if borrowing.created_at else None
             }
-              # Kirim ke Laravel
-            result = self._make_request('POST', '/api/sync/borrowings/from-flask', payload)
             
-            logger.info(f"Sync result for borrowing {borrowing_id}: success={result['success']}, status={result.get('status_code')}")
+            # Kirim ke Laravel
+            result = self._make_request('POST', '/api/sync/borrowings', payload)
             
             if not result['success']:
-                error_msg = result.get('error', 'Unknown error during sync')
-                logger.error(f"❌ Request failed for borrowing {borrowing_id}: {error_msg}")
-                return {'success': False, 'error': error_msg}
+                return {'success': False, 'error': result.get('error', 'Unknown error during sync')}
                 
             if result['status_code'] in [200, 201]:
                 # Update borrowing sebagai synced
@@ -262,36 +259,24 @@ class SyncService:
                 
                 # Simpan Laravel ID jika ada
                 response_data = result['data']
-                if isinstance(response_data, dict) and 'laravel_borrowing_id' in response_data:
+                if 'laravel_borrowing_id' in response_data:
                     borrowing.laravel_id = response_data['laravel_borrowing_id']
-                    logger.info(f"Laravel borrowing ID saved: {borrowing.laravel_id}")
                 
                 borrowing.updated_at = datetime.now()
                 db.commit()
                 
-                logger.info(f"✅ Borrowing {borrowing_id} synced successfully to Laravel")
+                logger.info(f"Borrowing {borrowing_id} synced successfully to Laravel")
+                # Return success response
                 return {
                     'success': True, 
                     'message': 'Borrowing synced successfully',
-                    'laravel_borrowing_id': response_data.get('laravel_borrowing_id') if isinstance(response_data, dict) else None
+                    'laravel_borrowing_id': response_data.get('laravel_borrowing_id')
                 }
-            
-            elif result['status_code'] == 409:
-                # Borrowing sudah ada di Laravel
-                borrowing.synced_to_server = True
-                borrowing.updated_at = datetime.now()
-                db.commit()
-                logger.warning(f"⚠️ Borrowing {borrowing_id} already exists in Laravel")
-                return {'success': True, 'message': 'Borrowing already exists in Laravel'}
-            
             else:
                 # HTTP error responses (non 2xx)
                 error_msg = f"HTTP error {result['status_code']}"
                 if isinstance(result['data'], dict) and 'message' in result['data']:
                     error_msg += f": {result['data']['message']}"
-                elif result['data']:
-                    error_msg += f": {str(result['data'])}"
-                logger.error(f"❌ HTTP error for borrowing {borrowing_id}: {error_msg}")
                 return {'success': False, 'error': error_msg}
                 
         except Exception as e:
@@ -401,76 +386,6 @@ class SyncService:
             error_msg = result.get('error', 'Connection failed')
             logger.error(f"Connection test to Laravel failed: {error_msg}")
             return {'success': False, 'error': error_msg}
-    
-    def check_pending_borrowings(self):
-        """Debug function - periksa borrowings yang belum sync"""
-        db = next(get_db())
-        
-        try:
-            # Ambil semua borrowing yang belum synced
-            pending_borrowings = db.query(Borrowing).filter(Borrowing.synced_to_server == False).all()
-            
-            logger.info(f"Found {len(pending_borrowings)} pending borrowings")
-            
-            for borrowing in pending_borrowings:
-                user = db.query(User).get(borrowing.id_user)
-                book = db.query(Book).get(borrowing.id_buku)
-                
-                logger.info(f"Pending borrowing ID: {borrowing.id_peminjaman}")
-                logger.info(f"  - User: {user.email if user else 'NOT FOUND'}")
-                logger.info(f"  - Book: {book.judul if book else 'NOT FOUND'}")
-                logger.info(f"  - Status: {borrowing.status}")
-                logger.info(f"  - Synced: {borrowing.synced_to_server}")
-                logger.info(f"  - Laravel ID: {borrowing.laravel_id}")
-                logger.info("---")
-            
-            return {
-                'total_pending': len(pending_borrowings),
-                'borrowings': [
-                    {
-                        'id': b.id_peminjaman,
-                        'user_email': db.query(User).get(b.id_user).email if db.query(User).get(b.id_user) else None,
-                        'book_title': db.query(Book).get(b.id_buku).judul if db.query(Book).get(b.id_buku) else None,
-                        'status': b.status,
-                        'synced': b.synced_to_server,
-                        'laravel_id': b.laravel_id
-                    }
-                    for b in pending_borrowings
-                ]
-            }
-            
-        except Exception as e:
-            logger.error(f"Exception checking pending borrowings: {str(e)}")
-            return {'success': False, 'error': str(e)}
-        finally:
-            db.close()
-
-    def force_sync_borrowing(self, borrowing_id):
-        """Force sync borrowing dengan logging detail"""
-        logger.info(f"🔄 Force syncing borrowing {borrowing_id}...")
-        
-        # Cek status sebelum sync
-        db = next(get_db())
-        try:
-            borrowing = db.query(Borrowing).filter(Borrowing.id_peminjaman == borrowing_id).first()
-            if borrowing:
-                logger.info(f"Before sync - synced_to_server: {borrowing.synced_to_server}, laravel_id: {borrowing.laravel_id}")
-        finally:
-            db.close()
-        
-        # Lakukan sync
-        result = self.sync_borrowing_to_laravel(borrowing_id)
-        
-        # Cek status setelah sync
-        db = next(get_db())
-        try:
-            borrowing = db.query(Borrowing).filter(Borrowing.id_peminjaman == borrowing_id).first()
-            if borrowing:
-                logger.info(f"After sync - synced_to_server: {borrowing.synced_to_server}, laravel_id: {borrowing.laravel_id}")
-        finally:
-            db.close()
-        
-        return result
 
 # Global instance
 sync_service = SyncService()
